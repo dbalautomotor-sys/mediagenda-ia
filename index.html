@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediAgenda IA — Panel del consultorio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR (escritorio) / MENÚ (móvil) ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C12 2 6 7.2 6 12.8C6 16.8 8.7 20 12 20C15.3 20 18 16.8 18 12.8C18 7.2 12 2 12 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M9 13.2C9.6 14.6 10.7 15.4 12 15.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">MediAgenda <em>IA</em></span>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Módulos principales">
+      <button class="nav-item is-active" data-view="dashboard" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="agenda" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 9.5H20.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 2.5V6.5M16 2.5V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>Agenda</span>
+      </button>
+      <button class="nav-item" data-view="pacientes" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.6"/><path d="M4.8 20c.9-3.6 3.9-5.8 7.2-5.8s6.3 2.2 7.2 5.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>Pacientes</span>
+      </button>
+      <button class="nav-item" data-view="recordatorios" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3C9 3 7 5.4 7 8.5C7 13 5.5 14.3 5.5 15.5C5.5 16.2 6 16.7 6.8 16.7H17.2C18 16.7 18.5 16.2 18.5 15.5C18.5 14.3 17 13 17 8.5C17 5.4 15 3 12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 19.5C10.4 20.4 11.1 21 12 21C12.9 21 13.6 20.4 14 19.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>Recordatorios</span>
+      </button>
+      <button class="nav-item" data-view="configuracion" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13.5c.1-.5.1-1 0-1.5l1.6-1.2-1.5-2.6-1.9.6c-.4-.3-.8-.6-1.3-.8l-.3-2H10l-.3 2c-.5.2-.9.5-1.3.8l-1.9-.6-1.5 2.6L6.6 12c-.1.5-.1 1 0 1.5L5 14.7l1.5 2.6 1.9-.6c.4.3.8.6 1.3.8l.3 2h4l.3-2c.5-.2.9-.5 1.3-.8l1.9.6 1.5-2.6-1.6-1.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span>Configuración</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="clinic-chip">
+        <span class="clinic-chip-avatar" id="clinicInitial">C</span>
+        <div class="clinic-chip-text">
+          <strong id="sidebarClinicName">Mi consultorio</strong>
+          <small>Plan prototipo</small>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Fondo oscuro al abrir menú móvil -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <!-- ===== CONTENIDO ===== -->
+  <div class="main-column">
+
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menú" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 7H20M4 12H20M4 17H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+
+      <div class="topbar-title">
+        <h1 id="clinicNameHeading">Mi consultorio</h1>
+        <p id="todayLabel">—</p>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="btn btn-primary" id="btnNuevaCitaTop" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Nueva cita</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="view-area">
+
+      <!-- ===================== DASHBOARD ===================== -->
+      <section class="view" id="view-dashboard" data-view-panel="dashboard">
+
+        <div class="summary-grid">
+          <article class="summary-card">
+            <div class="summary-icon summary-icon--navy" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="17" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 9.5H20.5" stroke="currentColor" stroke-width="1.6"/></svg>
+            </div>
+            <div class="summary-text">
+              <span class="summary-value" id="statHoy">0</span>
+              <span class="summary-label">Citas de hoy</span>
+            </div>
+          </article>
+
+          <article class="summary-card">
+            <div class="summary-icon summary-icon--amber" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.5V12L15 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <div class="summary-text">
+              <span class="summary-value" id="statPendientes">0</span>
+              <span class="summary-label">Pendientes</span>
+            </div>
+          </article>
+
+          <article class="summary-card">
+            <div class="summary-icon summary-icon--teal" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.5L9.5 17.5L19.5 6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="summary-text">
+              <span class="summary-value" id="statConfirmadas">0</span>
+              <span class="summary-label">Confirmadas</span>
+            </div>
+          </article>
+
+          <article class="summary-card summary-card--next">
+            <div class="summary-icon summary-icon--white" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 6.5V12.5L16 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/></svg>
+            </div>
+            <div class="summary-text">
+              <span class="summary-label summary-label--onnavy">Próxima cita</span>
+              <span class="summary-value summary-value--sm" id="statProxima">Sin citas próximas</span>
+              <span class="summary-sub" id="statProximaSub"></span>
+            </div>
+          </article>
+        </div>
+
+        <div class="dashboard-columns">
+
+          <section class="panel panel--list">
+            <div class="panel-header">
+              <h2>Próximas citas</h2>
+              <button class="link-btn" data-view-link="agenda" type="button">Ver agenda completa</button>
+            </div>
+
+            <div class="appointment-list" id="upcomingList">
+              <!-- se llena por JS -->
+            </div>
+          </section>
+
+          <section class="panel panel--activity">
+            <div class="panel-header">
+              <h2>Resumen de actividad</h2>
+            </div>
+
+            <ul class="activity-list" id="activityList">
+              <!-- se llena por JS -->
+            </ul>
+
+            <div class="mini-status">
+              <div class="mini-status-row">
+                <span class="dot dot--pending"></span> Pendiente <strong id="miniPend">0</strong>
+              </div>
+              <div class="mini-status-row">
+                <span class="dot dot--confirmed"></span> Confirmada <strong id="miniConf">0</strong>
+              </div>
+              <div class="mini-status-row">
+                <span class="dot dot--done"></span> Atendida <strong id="miniDone">0</strong>
+              </div>
+              <div class="mini-status-row">
+                <span class="dot dot--cancelled"></span> Cancelada <strong id="miniCanc">0</strong>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </section>
+
+      <!-- ===================== AGENDA ===================== -->
+      <section class="view" id="view-agenda" data-view-panel="agenda" hidden>
+
+        <div class="agenda-toolbar">
+          <div class="agenda-toolbar-row">
+            <div class="agenda-nav">
+              <button class="icon-btn" id="agendaPrev" type="button" aria-label="Periodo anterior">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button class="btn btn-ghost btn-sm" id="agendaHoy" type="button">Hoy</button>
+              <button class="icon-btn" id="agendaNext" type="button" aria-label="Periodo siguiente">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <input type="date" id="agendaDatePicker" class="agenda-date-input" aria-label="Ir a fecha">
+            </div>
+
+            <div class="agenda-view-toggle" role="tablist" aria-label="Vista de agenda">
+              <button class="toggle-btn is-active" data-agenda-view="dia" type="button" role="tab" aria-selected="true">Día</button>
+              <button class="toggle-btn" data-agenda-view="semana" type="button" role="tab" aria-selected="false">Semana</button>
+            </div>
+
+            <button class="btn btn-primary btn-sm" id="btnNuevaCitaAgenda" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>Nueva cita</span>
+            </button>
+          </div>
+
+          <div class="agenda-toolbar-row agenda-toolbar-row--filters">
+            <label class="agenda-search">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M20 20L15.5 15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="agendaSearch" placeholder="Buscar paciente…" aria-label="Buscar paciente">
+            </label>
+
+            <div class="filter-chips" id="agendaFilterChips">
+              <button class="chip is-active" data-filter="todas" type="button">Todas</button>
+              <button class="chip" data-filter="pendiente" type="button">Pendientes</button>
+              <button class="chip" data-filter="confirmada" type="button">Confirmadas</button>
+              <button class="chip" data-filter="atendida" type="button">Atendidas</button>
+              <button class="chip" data-filter="cancelada" type="button">Canceladas</button>
+            </div>
+
+            <span class="agenda-count" id="agendaCount">0 citas</span>
+          </div>
+        </div>
+
+        <h2 class="agenda-heading" id="agendaHeading">—</h2>
+
+        <div class="agenda-content" id="agendaContent">
+          <!-- Vista día: franjas horarias · Vista semana: columnas por día. Se llena por JS. -->
+        </div>
+      </section>
+
+      <!-- ===================== PACIENTES ===================== -->
+      <section class="view" id="view-pacientes" data-view-panel="pacientes" hidden>
+
+        <div class="agenda-toolbar">
+          <div class="agenda-toolbar-row">
+            <label class="agenda-search">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M20 20L15.5 15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="pacienteSearch" placeholder="Buscar paciente…" aria-label="Buscar paciente">
+            </label>
+            <span class="agenda-count" id="pacienteCount">0 pacientes</span>
+            <button class="btn btn-primary btn-sm" id="btnNuevoPaciente" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>Nuevo paciente</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="paciente-list" id="pacienteList"><!-- se llena por JS --></div>
+      </section>
+
+      <!-- ===================== RECORDATORIOS (placeholder fase 1) ===================== -->
+      <!-- ===================== RECORDATORIOS ===================== -->
+      <section class="view" id="view-recordatorios" data-view-panel="recordatorios" hidden>
+
+        <h2 class="agenda-heading" id="recordatorioHeading">Recordatorios</h2>
+        <p class="confirm-text" id="recordatorioIntro">Citas pendientes y confirmadas que podrían necesitar un aviso al paciente. La integración real con WhatsApp o correo requiere un proveedor autorizado y backend — por ahora el estado se actualiza manualmente y no se envía ningún mensaje real.</p>
+
+        <div class="agenda-toolbar">
+          <div class="agenda-toolbar-row agenda-toolbar-row--filters">
+            <div class="filter-chips" id="recordatorioFilterChips">
+              <button class="chip is-active" data-filter="todos" type="button">Todos</button>
+              <button class="chip" data-filter="pendiente" type="button">Pendientes</button>
+              <button class="chip" data-filter="enviado" type="button">Enviados</button>
+              <button class="chip" data-filter="descartado" type="button">Descartados</button>
+            </div>
+
+            <span class="agenda-count" id="recordatorioCount">0 recordatorios</span>
+          </div>
+        </div>
+
+        <div class="agenda-content" id="recordatorioList">
+          <!-- Se llena por JS: tarjetas de citas pendiente/confirmada que necesitan recordatorio. -->
+        </div>
+      </section>
+
+      <!-- ===================== CONFIGURACIÓN (funcional, ligera) ===================== -->
+      <section class="view" id="view-configuracion" data-view-panel="configuracion" hidden>
+        <div class="panel panel--form">
+          <div class="panel-header">
+            <h2>Configuración del consultorio</h2>
+          </div>
+          <form id="formConfig" class="config-form">
+            <label class="field">
+              <span>Nombre del consultorio</span>
+              <input type="text" id="cfgNombre" maxlength="60" required>
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span>Horario de inicio</span>
+                <input type="time" id="cfgInicio" required>
+              </label>
+              <label class="field">
+                <span>Horario de fin</span>
+                <input type="time" id="cfgFin" required>
+              </label>
+            </div>
+            <label class="field">
+              <span>Duración predeterminada de las citas</span>
+              <select id="cfgDuracion">
+                <option value="15">15 minutos</option>
+                <option value="20">20 minutos</option>
+                <option value="30" selected>30 minutos</option>
+                <option value="45">45 minutos</option>
+                <option value="60">60 minutos</option>
+              </select>
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="cfgRecordatorios">
+              <span>Activar preferencia de recordatorios (la integración de envío se conecta en la fase 2)</span>
+            </label>
+            <button class="btn btn-primary" type="submit">Guardar cambios</button>
+            <p class="form-note" id="configSavedNote" role="status"></p>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ===== MODAL: Nueva cita ===== -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <h2 id="modalTitle">Nueva cita</h2>
+      <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form id="formCita" class="modal-form">
+      <input type="hidden" id="citaId" value="">
+      <label class="field">
+        <span>Paciente</span>
+        <select id="citaPacienteId" required>
+          <option value="">Selecciona un paciente…</option>
+        </select>
+      </label>
+      <p class="field-hint" id="citaPacienteHint"></p>
+      <div class="field-row">
+        <label class="field">
+          <span>Fecha</span>
+          <input type="date" id="citaFecha" required>
+        </label>
+        <label class="field">
+          <span>Hora de inicio</span>
+          <input type="time" id="citaHora" required>
+        </label>
+      </div>
+      <label class="field">
+        <span>Motivo de la consulta</span>
+        <input type="text" id="citaMotivo" placeholder="Ej. Consulta general" maxlength="80">
+      </label>
+      <label class="field">
+        <span>Estado</span>
+        <select id="citaEstado">
+          <option value="pendiente" selected>Pendiente</option>
+          <option value="confirmada">Confirmada</option>
+          <option value="atendida">Atendida</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+      </label>
+      <p class="field-hint" id="citaDuracionHint"></p>
+      <p class="form-error" id="citaError" role="alert"></p>
+      <div class="modal-actions modal-actions--between">
+        <button type="button" class="btn btn-danger-ghost" id="btnEliminarCita" hidden>Eliminar</button>
+        <div class="modal-actions-right">
+          <button type="button" class="btn btn-ghost" id="btnCancelarCita">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btnGuardarCita">Guardar cita</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== MODAL: Ver detalle de cita (solo lectura) ===== -->
+<div class="modal-backdrop" id="modalDetalleBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detalleTitle">
+    <div class="modal-header">
+      <h2 id="detalleTitle">Detalle de la cita</h2>
+      <button class="modal-close" id="detalleClose" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <dl class="detail-grid" id="detalleBody"></dl>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="btnDetalleCerrar">Cerrar</button>
+      <button type="button" class="btn btn-primary" id="btnDetalleEditar">Editar cita</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Confirmar eliminación ===== -->
+<div class="modal-backdrop" id="modalConfirmBackdrop" hidden>
+  <div class="modal modal--sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal-header">
+      <h2 id="confirmTitle">Eliminar cita</h2>
+      <button class="modal-close" id="confirmClose" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p class="confirm-text" id="confirmText">¿Seguro que deseas eliminar esta cita? Esta acción no se puede deshacer.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="btnConfirmCancel">Cancelar</button>
+      <button type="button" class="btn btn-danger" id="btnConfirmDelete">Eliminar cita</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Nuevo paciente / editar paciente ===== -->
+<div class="modal-backdrop" id="modalPacienteBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pacienteModalTitle">
+    <div class="modal-header">
+      <h2 id="pacienteModalTitle">Nuevo paciente</h2>
+      <button class="modal-close" id="pacienteModalClose" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form id="formPaciente" class="modal-form">
+      <input type="hidden" id="pacienteId" value="">
+      <label class="field">
+        <span>Nombre completo</span>
+        <input type="text" id="pacienteNombre" placeholder="Ej. Ana López" maxlength="60" required>
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Teléfono</span>
+          <input type="tel" id="pacienteTelefono" placeholder="Ej. 33 1234 5678" maxlength="20">
+        </label>
+        <label class="field">
+          <span>Correo (opcional)</span>
+          <input type="email" id="pacienteCorreo" placeholder="correo@ejemplo.com" maxlength="80">
+        </label>
+      </div>
+      <label class="field">
+        <span>Notas administrativas</span>
+        <textarea id="pacienteNotas" rows="3" maxlength="300" placeholder="Notas de contacto, preferencias de horario, etc."></textarea>
+      </label>
+      <p class="form-error" id="pacienteError" role="alert"></p>
+      <div class="modal-actions modal-actions--between">
+        <button type="button" class="btn btn-danger-ghost" id="btnEliminarPaciente" hidden>Eliminar</button>
+        <div class="modal-actions-right">
+          <button type="button" class="btn btn-ghost" id="btnCancelarPaciente">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btnGuardarPaciente">Guardar paciente</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== MODAL: Detalle de paciente + historial de citas ===== -->
+<div class="modal-backdrop" id="modalPacienteDetalleBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pacienteDetalleTitle">
+    <div class="modal-header">
+      <h2 id="pacienteDetalleTitle">Detalle del paciente</h2>
+      <button class="modal-close" id="pacienteDetalleClose" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <dl class="detail-grid" id="pacienteDetalleBody"></dl>
+    <h3 class="paciente-historial-title">Historial de citas</h3>
+    <div class="appointment-list" id="pacienteHistorialList"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="btnPacienteDetalleCerrar">Cerrar</button>
+      <button type="button" class="btn btn-primary" id="btnPacienteDetalleEditar">Editar paciente</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
