@@ -335,4 +335,37 @@ const Store = {
       .filter((c) => c.pacienteId === id)
       .sort((a, b) => `${b.fecha}T${b.hora}`.localeCompare(`${a.fecha}T${a.hora}`));
   },
+
+  /**
+   * Genera un objeto de respaldo con todo lo guardado en localStorage
+   * (citas, pacientes y configuración), listo para convertirse en un
+   * archivo JSON descargable. Es solo lectura: no borra ni modifica nada.
+   *
+   * La configuración se lee directo de localStorage (no vía getConfig())
+   * para no incluir valores por defecto que en realidad nunca se guardaron.
+   * Si ese dato estuviera dañado (JSON inválido), el respaldo continúa con
+   * `config: null` y una advertencia, en vez de fallar por completo.
+   */
+  exportarRespaldo() {
+    let config = null;
+    let configDañada = false;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.config);
+      config = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      console.warn('exportarRespaldo: la configuración guardada está dañada, se exporta como null.', e);
+      configDañada = true;
+    }
+
+    return {
+      exportadoEn: new Date().toISOString(),
+      version: 1,
+      datos: {
+        citas: this.getCitas(),
+        pacientes: this.getPacientes(),
+        config,
+      },
+      advertencias: configDañada ? ['La configuración guardada no era JSON válido y se omitió.'] : [],
+    };
+  },
 };

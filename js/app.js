@@ -60,6 +60,8 @@
 
   const formConfig = document.getElementById('formConfig');
   const configSavedNote = document.getElementById('configSavedNote');
+  const btnDescargarRespaldo = document.getElementById('btnDescargarRespaldo');
+  const respaldoNote = document.getElementById('respaldoNote');
 
   const toast = document.getElementById('toast');
 
@@ -1123,6 +1125,37 @@
     configSavedNote.textContent = 'Cambios guardados.';
     renderClinicHeader();
     setTimeout(() => (configSavedNote.textContent = ''), 2500);
+  });
+
+  btnDescargarRespaldo.addEventListener('click', () => {
+    respaldoNote.style.color = '';
+    respaldoNote.textContent = '';
+    try {
+      const respaldo = Store.exportarRespaldo();
+      const blob = new Blob([JSON.stringify(respaldo, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = `mediagenda-respaldo-${todayISO()}.json`;
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      URL.revokeObjectURL(url);
+
+      if (respaldo.advertencias && respaldo.advertencias.length) {
+        respaldoNote.style.color = 'var(--amber-500)';
+        respaldoNote.textContent = `Respaldo descargado, con una advertencia: ${respaldo.advertencias[0]}`;
+      } else {
+        respaldoNote.style.color = 'var(--teal-600)';
+        respaldoNote.textContent = 'Respaldo descargado correctamente.';
+      }
+      showToast('Respaldo descargado correctamente.');
+    } catch (e) {
+      console.warn('No se pudo generar el respaldo.', e);
+      respaldoNote.style.color = 'var(--red-500)';
+      respaldoNote.textContent = 'No se pudo generar el respaldo. Intenta de nuevo.';
+    }
+    setTimeout(() => (respaldoNote.textContent = ''), 4000);
   });
 
   // ---------- Inicio ----------
