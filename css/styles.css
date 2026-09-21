@@ -157,9 +157,16 @@ input,select{font-family:inherit;}
   display:flex; align-items:center; justify-content:center;
   font-family:var(--font-display); font-weight:800; font-size:.95rem;
 }
-.clinic-chip-text{display:flex; flex-direction:column; line-height:1.25;}
+.clinic-chip-text{display:flex; flex-direction:column; line-height:1.25; min-width:0;}
 .clinic-chip-text strong{color:#fff; font-size:.86rem; font-weight:700;}
-.clinic-chip-text small{color:#8FA2B3; font-size:.74rem;}
+.clinic-chip-text small{color:#8FA2B3; font-size:.74rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+.sidebar-logout{
+  width:100%; justify-content:center; margin-top:10px;
+  background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); color:#EAF1F6;
+}
+.sidebar-logout:hover{background:rgba(255,255,255,.12);}
+.sidebar-logout svg{width:16px; height:16px;}
 
 .sidebar-backdrop{
   display:none;
@@ -557,6 +564,40 @@ input,select{font-family:inherit;}
 .field-check input{margin-top:3px;}
 .form-note{font-size:.83rem; color:var(--teal-600); font-weight:600; min-height:1.1em;}
 .form-error{font-size:.83rem; color:var(--red-500); font-weight:600; min-height:1.1em; margin:0;}
+
+/* ============================================================
+   Pantalla de acceso (login)
+   ============================================================ */
+.auth-screen{
+  position:fixed; inset:0; z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(160deg, var(--navy-900), var(--navy-800) 70%);
+  padding:24px;
+}
+.auth-screen[hidden]{display:none;}
+.auth-card{
+  width:100%; max-width:380px;
+  background:#fff; border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-modal);
+  padding:32px 28px;
+}
+.auth-brand{display:flex; align-items:center; gap:10px; margin-bottom:22px;}
+.auth-brand .brand-mark{
+  color:var(--teal-500);
+  display:flex; align-items:center; justify-content:center;
+  width:38px; height:38px;
+  background:var(--teal-100);
+  border-radius:10px;
+}
+.auth-brand-name{font-family:var(--font-display); font-weight:800; font-size:1.15rem; color:var(--navy-900);}
+.auth-brand-name em{color:var(--teal-500); font-style:normal;}
+.auth-title{font-size:1.3rem; margin-bottom:4px;}
+.auth-card .confirm-text{margin-bottom:20px;}
+.auth-submit{width:100%; justify-content:center; margin-top:4px;}
+
+@media (max-width:420px){
+  .auth-card{padding:26px 20px;}
+}
 
 /* ============================================================
    Modal

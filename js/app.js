@@ -18,6 +18,16 @@
   };
 
   // ---------- Referencias DOM ----------
+  const authScreen = document.getElementById('authScreen');
+  const appShell = document.getElementById('appShell');
+  const formLogin = document.getElementById('formLogin');
+  const loginCorreo = document.getElementById('loginCorreo');
+  const loginPassword = document.getElementById('loginPassword');
+  const loginError = document.getElementById('loginError');
+  const btnLogin = document.getElementById('btnLogin');
+  const btnCerrarSesion = document.getElementById('btnCerrarSesion');
+  const sidebarUserEmail = document.getElementById('sidebarUserEmail');
+
   const sidebar = document.getElementById('sidebar');
   const sidebarBackdrop = document.getElementById('sidebarBackdrop');
   const menuToggle = document.getElementById('menuToggle');
@@ -1158,8 +1168,22 @@
     setTimeout(() => (respaldoNote.textContent = ''), 4000);
   });
 
-  // ---------- Inicio ----------
-  function init() {
+  // ---------- Autenticación ----------
+  let appYaArrancada = false; // evita volver a dibujar todo si la sesión solo se renueva
+
+  function mostrarLogin() {
+    authScreen.hidden = false;
+    appShell.hidden = true;
+  }
+
+  function arrancarAppSiHaceFalta(sesion) {
+    authScreen.hidden = true;
+    appShell.hidden = false;
+    sidebarUserEmail.textContent = (sesion && sesion.user && sesion.user.email) || '';
+
+    if (appYaArrancada) return; // ya se dibujó una vez; no repetir por un simple refresco de token
+    appYaArrancada = true;
+
     agendaState.date = todayISO();
     renderClinicHeader();
     renderDashboard();
@@ -1167,6 +1191,50 @@
     renderPacientes();
     renderRecordatorios();
     setActiveView('dashboard');
+  }
+
+  formLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    const correo = loginCorreo.value.trim();
+    const password = loginPassword.value;
+
+    btnLogin.disabled = true;
+    btnLogin.textContent = 'Entrando…';
+    const resultado = await Auth.iniciarSesion(correo, password);
+    btnLogin.disabled = false;
+    btnLogin.textContent = 'Iniciar sesión';
+
+    if (!resultado.ok) {
+      loginError.textContent = resultado.mensaje;
+      return;
+    }
+    loginPassword.value = ''; // no dejar la contraseña en el campo tras un inicio exitoso
+    // La pantalla cambia sola vía Auth.onCambioSesion (ver init), no aquí directamente.
+  });
+
+  btnCerrarSesion.addEventListener('click', async () => {
+    await Auth.cerrarSesion();
+    appYaArrancada = false; // para que la próxima sesión sí vuelva a dibujar todo desde cero
+    // mostrarLogin() se dispara solo vía Auth.onCambioSesion.
+  });
+
+  // ---------- Inicio ----------
+  async function init() {
+    const sesion = await Auth.sesionActual();
+    if (sesion) {
+      arrancarAppSiHaceFalta(sesion);
+    } else {
+      mostrarLogin();
+    }
+
+    Auth.onCambioSesion((sesionNueva) => {
+      if (sesionNueva) {
+        arrancarAppSiHaceFalta(sesionNueva);
+      } else {
+        mostrarLogin();
+      }
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

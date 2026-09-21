@@ -8,10 +8,40 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<div class="app-shell">
+<!-- ===== PANTALLA DE ACCESO (visible por defecto; se oculta si hay sesión activa) ===== -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C12 2 6 7.2 6 12.8C6 16.8 8.7 20 12 20C15.3 20 18 16.8 18 12.8C18 7.2 12 2 12 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M9 13.2C9.6 14.6 10.7 15.4 12 15.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="auth-brand-name">MediAgenda <em>IA</em></span>
+    </div>
+    <h1 class="auth-title">Inicia sesión</h1>
+    <p class="confirm-text">Accede con el correo y la contraseña de tu consultorio.</p>
+    <form id="formLogin" class="modal-form">
+      <label class="field">
+        <span>Correo electrónico</span>
+        <input type="email" id="loginCorreo" placeholder="doctor@ejemplo.com" required autocomplete="username">
+      </label>
+      <label class="field">
+        <span>Contraseña</span>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </label>
+      <p class="form-error" id="loginError" role="alert"></p>
+      <button class="btn btn-primary auth-submit" type="submit" id="btnLogin">Iniciar sesión</button>
+    </form>
+  </div>
+</div>
+
+<div class="app-shell" id="appShell" hidden>
 
   <!-- ===== SIDEBAR (escritorio) / MENÚ (móvil) ===== -->
   <aside class="sidebar" id="sidebar">
@@ -53,9 +83,13 @@
         <span class="clinic-chip-avatar" id="clinicInitial">C</span>
         <div class="clinic-chip-text">
           <strong id="sidebarClinicName">Mi consultorio</strong>
-          <small>Plan prototipo</small>
+          <small id="sidebarUserEmail">Plan prototipo</small>
         </div>
       </div>
+      <button class="btn btn-ghost btn-sm sidebar-logout" type="button" id="btnCerrarSesion">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Cerrar sesión</span>
+      </button>
     </div>
   </aside>
 
@@ -475,6 +509,7 @@
 
 
 <script src="js/data.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
