@@ -351,6 +351,26 @@
           <button class="btn btn-ghost" type="button" id="btnDescargarRespaldo">Descargar respaldo</button>
           <p class="form-note" id="respaldoNote" role="status"></p>
         </div>
+
+        <div class="panel panel--form">
+          <div class="panel-header">
+            <h2>Conexión con Supabase (prueba, solo lectura)</h2>
+          </div>
+          <p class="confirm-text">Prueba de conexión de solo lectura con Supabase. No guarda, edita ni elimina nada — solo consulta y muestra los resultados aquí abajo. Tus datos siguen viviendo en este navegador mientras dure el prototipo.</p>
+          <button class="btn btn-ghost" type="button" id="btnProbarSupabase">Probar conexión</button>
+          <div class="mini-status" id="supabaseTestResults" hidden>
+            <div class="mini-status-row">
+              <span>Pacientes en Supabase:</span> <strong id="supabasePacientesCount">—</strong>
+            </div>
+            <div class="mini-status-row">
+              <span>Citas en Supabase:</span> <strong id="supabaseCitasCount">—</strong>
+            </div>
+            <div class="mini-status-row">
+              <span>Configuración:</span> <strong id="supabaseConfigEstado">—</strong>
+            </div>
+          </div>
+          <p class="form-note" id="supabaseTestNote" role="status"></p>
+        </div>
       </section>
 
     </main>

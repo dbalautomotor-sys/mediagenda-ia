@@ -73,6 +73,13 @@
   const btnDescargarRespaldo = document.getElementById('btnDescargarRespaldo');
   const respaldoNote = document.getElementById('respaldoNote');
 
+  const btnProbarSupabase = document.getElementById('btnProbarSupabase');
+  const supabaseTestResults = document.getElementById('supabaseTestResults');
+  const supabasePacientesCount = document.getElementById('supabasePacientesCount');
+  const supabaseCitasCount = document.getElementById('supabaseCitasCount');
+  const supabaseConfigEstado = document.getElementById('supabaseConfigEstado');
+  const supabaseTestNote = document.getElementById('supabaseTestNote');
+
   const toast = document.getElementById('toast');
 
   // ---------- Agenda: referencias DOM ----------
@@ -1166,6 +1173,48 @@
       respaldoNote.textContent = 'No se pudo generar el respaldo. Intenta de nuevo.';
     }
     setTimeout(() => (respaldoNote.textContent = ''), 4000);
+  });
+
+  // ---------- Prueba de conexión con Supabase (etapa 1, solo lectura) ----------
+  btnProbarSupabase.addEventListener('click', async () => {
+    const textoOriginal = btnProbarSupabase.textContent;
+    btnProbarSupabase.disabled = true;
+    btnProbarSupabase.textContent = 'Probando…';
+    supabaseTestNote.style.color = '';
+    supabaseTestNote.textContent = '';
+    supabaseTestResults.hidden = true;
+
+    try {
+      const [pacientesRes, citasRes, configRes] = await Promise.all([
+        supabaseGetPacientes(),
+        supabaseGetCitas(),
+        supabaseGetConfiguracion(),
+      ]);
+
+      supabasePacientesCount.textContent = pacientesRes.ok ? String(pacientesRes.total) : '—';
+      supabaseCitasCount.textContent = citasRes.ok ? String(citasRes.total) : '—';
+      supabaseConfigEstado.textContent = configRes.ok
+        ? (configRes.existe ? 'Encontrada' : 'Sin registros todavía')
+        : '—';
+      supabaseTestResults.hidden = false;
+
+      const errores = [pacientesRes, citasRes, configRes].filter((r) => !r.ok);
+      if (errores.length) {
+        supabaseTestNote.style.color = 'var(--red-500)';
+        supabaseTestNote.textContent = errores.map((r) => r.mensaje).join(' · ');
+      } else {
+        supabaseTestNote.style.color = 'var(--teal-600)';
+        supabaseTestNote.textContent = 'Conexión de prueba exitosa (solo lectura).';
+      }
+    } catch (e) {
+      console.warn('btnProbarSupabase: fallo inesperado.', e);
+      supabaseTestResults.hidden = false;
+      supabaseTestNote.style.color = 'var(--red-500)';
+      supabaseTestNote.textContent = 'Ocurrió un error inesperado al probar la conexión.';
+    } finally {
+      btnProbarSupabase.disabled = false;
+      btnProbarSupabase.textContent = textoOriginal;
+    }
   });
 
   // ---------- Autenticación ----------

@@ -369,3 +369,95 @@ const Store = {
     };
   },
 };
+
+/**
+ * MediAgenda IA — Conexión de prueba con Supabase (etapa 1, solo lectura)
+ * ---------------------------------------------------------------
+ * Estas tres funciones SOLO leen datos de Supabase para verificar que
+ * la conexión funciona. No guardan, editan ni eliminan nada, y no
+ * sustituyen a `Store`/`localStorage` de arriba, que sigue siendo la
+ * fuente real de datos de la app en esta etapa.
+ *
+ * Usan `supabaseClient`, el mismo cliente ya creado en js/auth.js
+ * (se referencia en tiempo de ejecución, no aquí arriba, por eso no
+ * importa que este archivo se cargue antes que auth.js en index.html).
+ *
+ * IMPORTANTE — supuesto de nombres de tabla: como no se ejecutó SQL
+ * ni se revisó el esquema real de tu proyecto, estas funciones asumen
+ * que las tablas se llaman 'pacientes', 'citas' y 'configuracion'. Si
+ * en tu Supabase se llaman distinto, solo ajusta las tres constantes
+ * de abajo.
+ * ---------------------------------------------------------------
+ */
+
+const SUPABASE_TABLA_PACIENTES = 'pacientes';
+const SUPABASE_TABLA_CITAS = 'citas';
+const SUPABASE_TABLA_CONFIGURACION = 'configuracion';
+
+/** Traduce un error de Supabase/PostgREST a un mensaje claro para mostrar en pantalla. */
+function mensajeDeErrorSupabase(error) {
+  const texto = ((error && error.message) || '').toLowerCase();
+  if (texto.includes('does not exist') || texto.includes('could not find the table')) {
+    return 'La tabla no existe todavía en Supabase (revisa el nombre).';
+  }
+  if (texto.includes('jwt') || texto.includes('permission') || texto.includes('policy') || texto.includes('rls')) {
+    return 'No autorizado para leer esta tabla (revisa las políticas de RLS en Supabase).';
+  }
+  if (texto.includes('failed to fetch') || texto.includes('network')) {
+    return 'No se pudo conectar con Supabase. Revisa tu conexión a internet.';
+  }
+  return (error && error.message) || 'No se pudo leer los datos desde Supabase.';
+}
+
+/** Lee solo el número de pacientes en Supabase (no descarga las filas completas). */
+async function supabaseGetPacientes() {
+  try {
+    if (typeof supabaseClient === 'undefined') {
+      return { ok: false, mensaje: 'El cliente de Supabase no está disponible (revisa js/auth.js).' };
+    }
+    const { count, error } = await supabaseClient
+      .from(SUPABASE_TABLA_PACIENTES)
+      .select('*', { count: 'exact', head: true });
+    if (error) return { ok: false, mensaje: mensajeDeErrorSupabase(error) };
+    return { ok: true, total: count || 0 };
+  } catch (e) {
+    console.warn('supabaseGetPacientes: fallo inesperado.', e);
+    return { ok: false, mensaje: 'No se pudo conectar con Supabase. Intenta de nuevo.' };
+  }
+}
+
+/** Lee solo el número de citas en Supabase (no descarga las filas completas). */
+async function supabaseGetCitas() {
+  try {
+    if (typeof supabaseClient === 'undefined') {
+      return { ok: false, mensaje: 'El cliente de Supabase no está disponible (revisa js/auth.js).' };
+    }
+    const { count, error } = await supabaseClient
+      .from(SUPABASE_TABLA_CITAS)
+      .select('*', { count: 'exact', head: true });
+    if (error) return { ok: false, mensaje: mensajeDeErrorSupabase(error) };
+    return { ok: true, total: count || 0 };
+  } catch (e) {
+    console.warn('supabaseGetCitas: fallo inesperado.', e);
+    return { ok: false, mensaje: 'No se pudo conectar con Supabase. Intenta de nuevo.' };
+  }
+}
+
+/** Revisa si hay al menos un registro de configuración en Supabase, sin descargar más de una fila. */
+async function supabaseGetConfiguracion() {
+  try {
+    if (typeof supabaseClient === 'undefined') {
+      return { ok: false, mensaje: 'El cliente de Supabase no está disponible (revisa js/auth.js).' };
+    }
+    const { data, error } = await supabaseClient
+      .from(SUPABASE_TABLA_CONFIGURACION)
+      .select('*')
+      .limit(1);
+    if (error) return { ok: false, mensaje: mensajeDeErrorSupabase(error) };
+    const fila = (data && data[0]) || null;
+    return { ok: true, existe: !!fila, datos: fila };
+  } catch (e) {
+    console.warn('supabaseGetConfiguracion: fallo inesperado.', e);
+    return { ok: false, mensaje: 'No se pudo conectar con Supabase. Intenta de nuevo.' };
+  }
+}
