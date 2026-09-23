@@ -461,3 +461,282 @@ async function supabaseGetConfiguracion() {
     return { ok: false, mensaje: 'No se pudo conectar con Supabase. Intenta de nuevo.' };
   }
 }
+
+/**
+ * MediAgenda IA — Migración de localStorage a Supabase (Fase 2)
+ * ---------------------------------------------------------------
+ * Copia lo que ya existe en este navegador (pacientes, citas y
+ * configuración, leídos vía `Store`) hacia las tablas de Supabase,
+ * incluyendo `owner_id` del usuario con sesión activa para que las
+ * políticas RLS (`owner_id = auth.uid()`) dejen pasar la escritura.
+ *
+ * NO toca localStorage salvo por una llave NUEVA y separada
+ * ('mediagenda.migracion') donde se guarda qué registro local ya se
+ * migró a qué UUID de Supabase, para poder volver a ejecutar la
+ * migración sin duplicar nada. Las llaves originales de la app
+ * (mediagenda.pacientes / .citas / .config) no se leen dos veces ni
+ * se modifican aquí.
+ *
+ * LÍMITE HONESTO: como este entorno no tiene una conexión directa a
+ * tu proyecto de Supabase para inspeccionar el esquema real, no pude
+ * verificar los nombres exactos de columna ni ejecutar ningún SQL.
+ * Lo de abajo son SUPUESTOS basados en los campos que ya usa `Store`
+ * en este mismo archivo, ajustados con lo que confirmaste en tu
+ * última revisión:
+ *   - `pacientes` y `citas` tienen una columna `id` (uuid, primary
+ *     key) y una columna `owner_id` (uuid).
+ *   - `configuracion` NO tiene columna `id` propia: su clave
+ *     primaria es `owner_id` (una fila por usuario). Por eso su
+ *     migración usa `upsert` con `onConflict: 'owner_id'` en vez de
+ *     generar un `id` nuevo — ver `migrarConfiguracionASupabase`.
+ *   - `citas.paciente_id` es NOT NULL (obligatoria): una cita nunca
+ *     se inserta con ese campo en null. Si el paciente de esa cita no
+ *     se pudo migrar, la cita se cuenta como fallida y no se envía a
+ *     Supabase — ver `migrarCitasASupabase`.
+ *   - Los demás nombres de columna están en `SUPABASE_COLUMNAS` aquí
+ *     abajo — es el ÚNICO lugar que necesitas editar si tus columnas
+ *     reales se llaman distinto.
+ * La detección de duplicados en `configuracion` queda a cargo del
+ * propio `upsert` de Supabase (por `owner_id`), así que funciona
+ * incluso entre navegadores distintos. Para `pacientes` y `citas` la
+ * detección de duplicados solo cubre este mismo navegador (mapa en
+ * `mediagenda.migracion`) — si corres la migración desde otro
+ * navegador, o después de borrar los datos de este, no hay forma de
+ * detectar duplicados sin agregar una columna a esas tablas (y no se
+ * ejecutó ningún SQL para hacerlo).
+ * ---------------------------------------------------------------
+ */
+
+const MIGRACION_STORAGE_KEY = 'mediagenda.migracion';
+
+const SUPABASE_COLUMNAS = {
+  pacientes: { nombre: 'nombre', telefono: 'telefono', correo: 'correo', notas: 'notas' },
+  citas: {
+    pacienteId: 'paciente_id',
+    paciente: 'paciente',
+    motivo: 'motivo',
+    fecha: 'fecha',
+    hora: 'hora',
+    duracion: 'duracion',
+    estado: 'estado',
+    recordatorioEstado: 'recordatorio_estado',
+  },
+  configuracion: {
+    nombreConsultorio: 'nombre_consultorio',
+    horaInicio: 'hora_inicio',
+    horaFin: 'hora_fin',
+    duracionCita: 'duracion_cita',
+    recordatoriosActivos: 'recordatorios_activos',
+  },
+};
+
+/** Genera un UUID v4 válido para usarlo como `id` nuevo al migrar un registro. */
+function generarUUID() {
+  if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+  // Alternativa RFC4122 v4 para navegadores sin crypto.randomUUID.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/** Lee el mapa local-id → Supabase-UUID guardado por una corrida previa de la migración. */
+function leerEstadoMigracion() {
+  try {
+    const raw = localStorage.getItem(MIGRACION_STORAGE_KEY);
+    if (!raw) return { pacientes: {}, citas: {}, configuracion: null };
+    const estado = JSON.parse(raw);
+    return {
+      pacientes: estado.pacientes || {},
+      citas: estado.citas || {},
+      configuracion: estado.configuracion || null,
+    };
+  } catch (e) {
+    console.warn('No se pudo leer el estado de migración guardado; se asume que no hay nada migrado.', e);
+    return { pacientes: {}, citas: {}, configuracion: null };
+  }
+}
+
+/** Guarda el progreso de la migración (se llama tras cada registro migrado, no solo al final). */
+function guardarEstadoMigracion(estado) {
+  try {
+    localStorage.setItem(
+      MIGRACION_STORAGE_KEY,
+      JSON.stringify({ ...estado, ultimaCorrida: new Date().toISOString() })
+    );
+  } catch (e) {
+    console.warn('No se pudo guardar el progreso de la migración.', e);
+  }
+}
+
+/** owner_id (uuid) del usuario con sesión activa, o null si no hay sesión. */
+async function supabaseObtenerOwnerId() {
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error || !data.session || !data.session.user) return null;
+    return data.session.user.id;
+  } catch (e) {
+    console.warn('supabaseObtenerOwnerId: fallo inesperado.', e);
+    return null;
+  }
+}
+
+/** Migra los pacientes que aún no estén en el mapa `estado.pacientes`. */
+async function migrarPacientesASupabase(ownerId, estado) {
+  const resultado = { migrados: 0, omitidos: 0, fallidos: 0, errores: [] };
+  const pacientes = Store.getPacientes();
+  const col = SUPABASE_COLUMNAS.pacientes;
+
+  for (const p of pacientes) {
+    if (estado.pacientes[p.id]) {
+      resultado.omitidos++;
+      continue;
+    }
+    const nuevoId = generarUUID();
+    try {
+      const payload = {
+        id: nuevoId,
+        owner_id: ownerId,
+        [col.nombre]: p.nombre || '',
+        [col.telefono]: p.telefono || '',
+        [col.correo]: p.correo || '',
+        [col.notas]: p.notas || '',
+      };
+      const { error } = await supabaseClient.from(SUPABASE_TABLA_PACIENTES).insert(payload);
+      if (error) throw error;
+      estado.pacientes[p.id] = nuevoId; // mapa id local -> UUID nuevo en Supabase
+      guardarEstadoMigracion(estado);
+      resultado.migrados++;
+    } catch (e) {
+      resultado.fallidos++;
+      resultado.errores.push(`Paciente "${p.nombre || p.id}": ${mensajeDeErrorSupabase(e)}`);
+      console.warn('migrarPacientesASupabase: fallo con un paciente.', p, e);
+    }
+  }
+  return resultado;
+}
+
+/** Migra las citas que aún no estén en el mapa `estado.citas`, conservando el vínculo con su paciente ya migrado. */
+async function migrarCitasASupabase(ownerId, estado) {
+  const resultado = { migrados: 0, omitidos: 0, fallidos: 0, errores: [] };
+  const citas = Store.getCitas();
+  const col = SUPABASE_COLUMNAS.citas;
+
+  for (const c of citas) {
+    if (estado.citas[c.id]) {
+      resultado.omitidos++;
+      continue;
+    }
+
+    // `paciente_id` es obligatoria (NOT NULL) en Supabase: si el paciente de esta
+    // cita no existe localmente o no se pudo migrar, la cita queda como error y
+    // NUNCA se inserta con paciente_id en null.
+    const pacienteIdSupabase = c.pacienteId ? estado.pacientes[c.pacienteId] : null;
+    if (!pacienteIdSupabase) {
+      resultado.fallidos++;
+      resultado.errores.push(
+        `Cita de "${c.paciente || c.id}" no se migró: no tiene un paciente vinculado y migrado con éxito en Supabase (paciente_id es obligatoria).`
+      );
+      continue;
+    }
+
+    const nuevoId = generarUUID();
+    try {
+      const payload = {
+        id: nuevoId,
+        owner_id: ownerId,
+        [col.pacienteId]: pacienteIdSupabase,
+        [col.paciente]: c.paciente || '',
+        [col.motivo]: c.motivo || '',
+        [col.fecha]: c.fecha,
+        [col.hora]: c.hora,
+        [col.duracion]: Number(c.duracion || 30),
+        [col.estado]: c.estado || 'pendiente',
+        [col.recordatorioEstado]: c.recordatorioEstado || 'pendiente',
+      };
+      const { error } = await supabaseClient.from(SUPABASE_TABLA_CITAS).insert(payload);
+      if (error) throw error;
+      estado.citas[c.id] = nuevoId;
+      guardarEstadoMigracion(estado);
+      resultado.migrados++;
+    } catch (e) {
+      resultado.fallidos++;
+      resultado.errores.push(`Cita de "${c.paciente || c.id}": ${mensajeDeErrorSupabase(e)}`);
+      console.warn('migrarCitasASupabase: fallo con una cita.', c, e);
+    }
+  }
+  return resultado;
+}
+
+/**
+ * Migra la configuración. `configuracion` no tiene columna `id` propia: su
+ * clave primaria es `owner_id` (una fila por usuario), así que se usa
+ * `upsert` con `onConflict: 'owner_id'` — inserta si no existe, y si ya
+ * existe una fila para este owner (de esta corrida o de otro navegador)
+ * la actualiza en vez de duplicarla.
+ */
+async function migrarConfiguracionASupabase(ownerId, estado) {
+  const col = SUPABASE_COLUMNAS.configuracion;
+  if (estado.configuracion) {
+    return { migrada: false, omitida: true, error: null };
+  }
+  try {
+    const config = Store.getConfig();
+    const payload = {
+      owner_id: ownerId, // clave primaria de `configuracion`; no existe columna `id` separada
+      [col.nombreConsultorio]: config.nombreConsultorio,
+      [col.horaInicio]: config.horaInicio,
+      [col.horaFin]: config.horaFin,
+      [col.duracionCita]: Number(config.duracionCita),
+      [col.recordatoriosActivos]: !!config.recordatoriosActivos,
+    };
+    const { error } = await supabaseClient
+      .from(SUPABASE_TABLA_CONFIGURACION)
+      .upsert(payload, { onConflict: 'owner_id' });
+    if (error) throw error;
+    estado.configuracion = true;
+    guardarEstadoMigracion(estado);
+    return { migrada: true, omitida: false, error: null };
+  } catch (e) {
+    console.warn('migrarConfiguracionASupabase: fallo.', e);
+    return { migrada: false, omitida: false, error: mensajeDeErrorSupabase(e) };
+  }
+}
+
+/**
+ * Orquesta la migración completa: pacientes → citas (conservando el
+ * vínculo con su paciente) → configuración. Es seguro volver a
+ * llamarla: lo que ya se migró se omite (ver `leerEstadoMigracion`).
+ * No modifica ni borra nada en localStorage salvo la llave de
+ * progreso `mediagenda.migracion`.
+ */
+async function supabaseMigrarDatos() {
+  if (typeof supabaseClient === 'undefined') {
+    return { ok: false, mensaje: 'El cliente de Supabase no está disponible (revisa js/auth.js).' };
+  }
+
+  const ownerId = await supabaseObtenerOwnerId();
+  if (!ownerId) {
+    return { ok: false, mensaje: 'No hay una sesión activa. Inicia sesión antes de migrar tus datos.' };
+  }
+
+  const estado = leerEstadoMigracion();
+
+  const resultadoPacientes = await migrarPacientesASupabase(ownerId, estado);
+  const resultadoCitas = await migrarCitasASupabase(ownerId, estado);
+  const resultadoConfiguracion = await migrarConfiguracionASupabase(ownerId, estado);
+
+  const huboFallos =
+    resultadoPacientes.fallidos > 0 || resultadoCitas.fallidos > 0 || !!resultadoConfiguracion.error;
+
+  return {
+    ok: !huboFallos,
+    mensaje: huboFallos
+      ? 'La migración terminó con algunos errores. Revisa el detalle abajo.'
+      : 'Migración completada correctamente.',
+    pacientes: resultadoPacientes,
+    citas: resultadoCitas,
+    configuracion: resultadoConfiguracion,
+  };
+}

@@ -371,6 +371,21 @@
           </div>
           <p class="form-note" id="supabaseTestNote" role="status"></p>
         </div>
+
+        <div class="panel panel--form">
+          <div class="panel-header">
+            <h2>Migración de datos a Supabase (localStorage → Supabase)</h2>
+          </div>
+          <p class="confirm-text">Copia tus pacientes, citas y configuración guardados en este navegador hacia Supabase, conservando el vínculo entre cada cita y su paciente. No borra ni cambia nada en este navegador, y es seguro ejecutarla más de una vez: lo que ya se migró no se vuelve a duplicar.</p>
+          <button class="btn btn-primary" type="button" id="btnMigrarDatos">Migrar mis datos a Supabase</button>
+          <div class="mini-status" id="migracionResultados" hidden>
+            <div class="mini-status-row"><span>Pacientes:</span> <strong id="migracionPacientesResumen">—</strong></div>
+            <div class="mini-status-row"><span>Citas:</span> <strong id="migracionCitasResumen">—</strong></div>
+            <div class="mini-status-row"><span>Configuración:</span> <strong id="migracionConfigResumen">—</strong></div>
+          </div>
+          <div class="confirm-text" id="migracionErrores" hidden></div>
+          <p class="form-note" id="migracionNote" role="status"></p>
+        </div>
       </section>
 
     </main>

@@ -80,6 +80,14 @@
   const supabaseConfigEstado = document.getElementById('supabaseConfigEstado');
   const supabaseTestNote = document.getElementById('supabaseTestNote');
 
+  const btnMigrarDatos = document.getElementById('btnMigrarDatos');
+  const migracionResultados = document.getElementById('migracionResultados');
+  const migracionPacientesResumen = document.getElementById('migracionPacientesResumen');
+  const migracionCitasResumen = document.getElementById('migracionCitasResumen');
+  const migracionConfigResumen = document.getElementById('migracionConfigResumen');
+  const migracionErrores = document.getElementById('migracionErrores');
+  const migracionNote = document.getElementById('migracionNote');
+
   const toast = document.getElementById('toast');
 
   // ---------- Agenda: referencias DOM ----------
@@ -1214,6 +1222,70 @@
     } finally {
       btnProbarSupabase.disabled = false;
       btnProbarSupabase.textContent = textoOriginal;
+    }
+  });
+
+  // ---------- Migración de datos a Supabase (Fase 2) ----------
+  btnMigrarDatos.addEventListener('click', async () => {
+    const confirmado = window.confirm(
+      'Esto copiará tus pacientes, citas y configuración guardados en este navegador hacia Supabase. ' +
+      'Los que ya se hayan migrado antes no se van a duplicar. ¿Continuar?'
+    );
+    if (!confirmado) return;
+
+    const textoOriginal = btnMigrarDatos.textContent;
+    btnMigrarDatos.disabled = true;
+    btnMigrarDatos.textContent = 'Migrando…';
+    migracionNote.style.color = '';
+    migracionNote.textContent = '';
+    migracionResultados.hidden = true;
+    migracionErrores.hidden = true;
+    migracionErrores.innerHTML = '';
+
+    try {
+      const resultado = await supabaseMigrarDatos();
+
+      if (!resultado.pacientes) {
+        // Error temprano (sin sesión, sin cliente de Supabase, etc.): no hubo nada que resumir.
+        migracionNote.style.color = 'var(--red-500)';
+        migracionNote.textContent = resultado.mensaje;
+        return;
+      }
+
+      migracionPacientesResumen.textContent =
+        `${resultado.pacientes.migrados} migrados, ${resultado.pacientes.omitidos} ya existían, ${resultado.pacientes.fallidos} con error`;
+      migracionCitasResumen.textContent =
+        `${resultado.citas.migrados} migradas, ${resultado.citas.omitidos} ya existían, ${resultado.citas.fallidos} con error`;
+      migracionConfigResumen.textContent = resultado.configuracion.migrada
+        ? 'Migrada'
+        : resultado.configuracion.omitida
+          ? 'Ya existía (no se duplicó)'
+          : `Con error: ${resultado.configuracion.error}`;
+      migracionResultados.hidden = false;
+
+      const errores = [
+        ...resultado.pacientes.errores,
+        ...resultado.citas.errores,
+        ...(resultado.configuracion.error ? [`Configuración: ${resultado.configuracion.error}`] : []),
+      ];
+      if (errores.length) {
+        errores.forEach((msg) => {
+          const p = document.createElement('p');
+          p.textContent = `• ${msg}`;
+          migracionErrores.appendChild(p);
+        });
+        migracionErrores.hidden = false;
+      }
+
+      migracionNote.style.color = resultado.ok ? 'var(--teal-600)' : 'var(--red-500)';
+      migracionNote.textContent = resultado.mensaje;
+    } catch (e) {
+      console.warn('btnMigrarDatos: fallo inesperado.', e);
+      migracionNote.style.color = 'var(--red-500)';
+      migracionNote.textContent = 'Ocurrió un error inesperado durante la migración.';
+    } finally {
+      btnMigrarDatos.disabled = false;
+      btnMigrarDatos.textContent = textoOriginal;
     }
   });
 
