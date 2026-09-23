@@ -748,3 +748,143 @@ async function supabaseMigrarDatos() {
     configuracion: resultadoConfiguracion,
   };
 }
+
+/**
+ * MediAgenda IA — Lectura de Dashboard y Agenda desde Supabase (Fase 3)
+ * ---------------------------------------------------------------
+ * Funciones de SOLO LECTURA para que el Dashboard y la Agenda puedan
+ * mostrar los datos reales del usuario autenticado. No escriben nada
+ * en Supabase ni en localStorage. Cada una:
+ *   - Verifica que haya una sesión activa antes de consultar nada
+ *     (nunca se consulta "a ciegas" sin `owner_id`/sesión).
+ *   - Deja que RLS (`owner_id = auth.uid()`) sea quien realmente
+ *     filtra los renglones; cualquier `.eq('owner_id', ...)` extra
+ *     aquí es solo claridad, no un reemplazo de RLS.
+ *   - Nunca lanza una excepción hacia afuera: cualquier error de red
+ *     o de permisos se atrapa y se traduce con `mensajeDeErrorSupabase`.
+ *
+ * `citas` no tiene columna de texto `paciente` (se confirmó con un
+ * error real de Supabase en la fase de migración), así que el nombre
+ * del paciente para cada cita se resuelve aquí mismo, uniendo por
+ * `paciente_id` contra la lista de `pacientes` ya leída — nunca se
+ * inventa una relación ni una columna que no exista.
+ *
+ * COMPATIBILIDAD CON EDITAR/ELIMINAR: las citas y pacientes que ya se
+ * migraron tienen un registro local equivalente (ver el mapa de
+ * `mediagenda.migracion`). Para que "Editar"/"Eliminar" en la Agenda
+ * sigan funcionando exactamente igual que antes (siguen operando
+ * sobre `Store`/localStorage — esta fase NO migra escritura), cada
+ * cita/paciente leído de Supabase recupera aquí su `id` LOCAL
+ * original a través de ese mapa. Si alguna vez apareciera en Supabase
+ * un registro sin contraparte local (no migrado desde este
+ * navegador), se marca con `_soloLectura: true` y la interfaz oculta
+ * sus botones de editar/eliminar en vez de fallar en silencio.
+ * ---------------------------------------------------------------
+ */
+
+/** Pacientes + citas del owner autenticado, ya unidos y con los nombres de columna reales de `citas` (sin inventar `paciente`). */
+async function supabaseListarCitasYPacientes() {
+  if (typeof supabaseClient === 'undefined') {
+    return { ok: false, mensaje: 'El cliente de Supabase no está disponible (revisa js/auth.js).' };
+  }
+  const ownerId = await supabaseObtenerOwnerId();
+  if (!ownerId) {
+    return { ok: false, mensaje: 'No hay una sesión activa. Inicia sesión de nuevo.' };
+  }
+
+  try {
+    const colC = SUPABASE_COLUMNAS.citas;
+    const [resPacientes, resCitas] = await Promise.all([
+      supabaseClient.from(SUPABASE_TABLA_PACIENTES).select('*'),
+      supabaseClient.from(SUPABASE_TABLA_CITAS).select('*').order(colC.fecha, { ascending: true }).order(colC.hora, { ascending: true }),
+    ]);
+    if (resPacientes.error) throw resPacientes.error;
+    if (resCitas.error) throw resCitas.error;
+
+    // Mapa id-local -> uuid-Supabase (de la migración ya hecha), invertido aquí a
+    // uuid-Supabase -> id-local, para poder editar/eliminar vía `Store` como antes.
+    const migracion = leerEstadoMigracion();
+    const supaAPacienteLocal = {};
+    Object.keys(migracion.pacientes).forEach((idLocal) => {
+      supaAPacienteLocal[migracion.pacientes[idLocal]] = idLocal;
+    });
+    const supaACitaLocal = {};
+    Object.keys(migracion.citas).forEach((idLocal) => {
+      supaACitaLocal[migracion.citas[idLocal]] = idLocal;
+    });
+
+    const colP = SUPABASE_COLUMNAS.pacientes;
+    const nombrePorSupabaseId = {};
+    const pacientes = (resPacientes.data || []).map((p) => {
+      const nombre = p[colP.nombre] || 'Paciente sin nombre';
+      nombrePorSupabaseId[p.id] = nombre;
+      return {
+        id: supaAPacienteLocal[p.id] || p.id,
+        _supabaseId: p.id,
+        _soloLectura: !supaAPacienteLocal[p.id],
+        nombre,
+        telefono: p[colP.telefono] || '',
+        correo: p[colP.correo] || '',
+        notas: p[colP.notas] || '',
+      };
+    });
+
+    const citas = (resCitas.data || []).map((c) => {
+      const idLocal = supaACitaLocal[c.id];
+      const pacienteIdSupabase = c[colC.pacienteId];
+      return {
+        id: idLocal || c.id,
+        _supabaseId: c.id,
+        _soloLectura: !idLocal,
+        pacienteId: supaAPacienteLocal[pacienteIdSupabase] || pacienteIdSupabase,
+        paciente: nombrePorSupabaseId[pacienteIdSupabase] || 'Paciente no encontrado',
+        motivo: c[colC.motivo] || '',
+        fecha: c[colC.fecha],
+        hora: (c[colC.hora] || '').slice(0, 5), // Supabase puede devolver "HH:MM:SS"; se recorta a "HH:MM"
+        duracion: Number(c[colC.duracion] || 30),
+        estado: c[colC.estado] || 'pendiente',
+        recordatorioEstado: c[colC.recordatorioEstado] || 'pendiente',
+      };
+    });
+
+    return { ok: true, pacientes, citas, mensaje: null };
+  } catch (e) {
+    console.warn('supabaseListarCitasYPacientes: fallo.', e);
+    return { ok: false, mensaje: mensajeDeErrorSupabase(e) };
+  }
+}
+
+/** Configuración del owner autenticado, mapeada al mismo formato que `Store.getConfig()`. No usada aún por ninguna vista (Configuración sigue siendo local esta fase); queda lista para cuando se conecte. */
+async function supabaseListarConfiguracion() {
+  if (typeof supabaseClient === 'undefined') {
+    return { ok: false, mensaje: 'El cliente de Supabase no está disponible (revisa js/auth.js).' };
+  }
+  const ownerId = await supabaseObtenerOwnerId();
+  if (!ownerId) {
+    return { ok: false, mensaje: 'No hay una sesión activa. Inicia sesión de nuevo.' };
+  }
+  try {
+    const col = SUPABASE_COLUMNAS.configuracion;
+    const { data, error } = await supabaseClient
+      .from(SUPABASE_TABLA_CONFIGURACION)
+      .select('*')
+      .eq('owner_id', ownerId)
+      .limit(1);
+    if (error) throw error;
+    const fila = (data && data[0]) || null;
+    if (!fila) return { ok: true, datos: null };
+    return {
+      ok: true,
+      datos: {
+        nombreConsultorio: fila[col.nombreConsultorio],
+        horaInicio: fila[col.horaInicio],
+        horaFin: fila[col.horaFin],
+        duracionCita: Number(fila[col.duracionCita]),
+        recordatoriosActivos: !!fila[col.recordatoriosActivos],
+      },
+    };
+  } catch (e) {
+    console.warn('supabaseListarConfiguracion: fallo.', e);
+    return { ok: false, mensaje: mensajeDeErrorSupabase(e) };
+  }
+}

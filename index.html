@@ -122,6 +122,8 @@
       <!-- ===================== DASHBOARD ===================== -->
       <section class="view" id="view-dashboard" data-view-panel="dashboard">
 
+        <p class="form-note" id="dashboardFuenteNota" role="status"></p>
+
         <div class="summary-grid">
           <article class="summary-card">
             <div class="summary-icon summary-icon--navy" aria-hidden="true">
@@ -200,6 +202,12 @@
               <div class="mini-status-row">
                 <span class="dot dot--cancelled"></span> Cancelada <strong id="miniCanc">0</strong>
               </div>
+              <div class="mini-status-row">
+                <span>Total de pacientes</span> <strong id="statTotalPacientes">0</strong>
+              </div>
+              <div class="mini-status-row">
+                <span>Total de citas</span> <strong id="statTotalCitas">0</strong>
+              </div>
             </div>
           </section>
 
@@ -208,6 +216,8 @@
 
       <!-- ===================== AGENDA ===================== -->
       <section class="view" id="view-agenda" data-view-panel="agenda" hidden>
+
+        <p class="form-note" id="agendaFuenteNota" role="status"></p>
 
         <div class="agenda-toolbar">
           <div class="agenda-toolbar-row">

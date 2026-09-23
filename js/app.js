@@ -88,6 +88,11 @@
   const migracionErrores = document.getElementById('migracionErrores');
   const migracionNote = document.getElementById('migracionNote');
 
+  const dashboardFuenteNota = document.getElementById('dashboardFuenteNota');
+  const agendaFuenteNota = document.getElementById('agendaFuenteNota');
+  const statTotalPacientes = document.getElementById('statTotalPacientes');
+  const statTotalCitas = document.getElementById('statTotalCitas');
+
   const toast = document.getElementById('toast');
 
   // ---------- Agenda: referencias DOM ----------
@@ -236,21 +241,90 @@
   }
 
   // ---------- Navegación entre módulos ----------
+
+  /**
+   * MediAgenda IA — Fase 3: fuente de datos de Dashboard y Agenda
+   * ---------------------------------------------------------------
+   * Dashboard y Agenda leen de aquí (`vistaDatos`), no directo de
+   * `Store`. `cargarDatosVista()` intenta Supabase primero; si falla
+   * (sin sesión, sin red, RLS, etc.) cae a `Store` (localStorage) y
+   * lo deja bien marcado como `fuente: 'local'` — nunca se presenta
+   * el respaldo local como si fuera un dato confirmado en Supabase
+   * (ver `renderFuenteDatos`).
+   *
+   * Tras cualquier edición local (crear/editar/eliminar cita o
+   * paciente) se usa `usarDatosLocales()` en vez de volver a consultar
+   * Supabase: como esta fase todavía NO escribe en Supabase, un
+   * refresco a Supabase justo después de guardar mostraría datos
+   * desactualizados. `usarDatosLocales()` deja ver de inmediato el
+   * cambio que se acaba de guardar, etiquetado como local.
+   *
+   * Pacientes y Recordatorios NO se tocan en esta fase: siguen
+   * leyendo directo de `Store`, igual que antes.
+   */
+  let vistaDatos = { fuente: 'local', citas: [], pacientes: [], error: null };
+
+  function usarDatosLocales(motivo) {
+    vistaDatos = { fuente: 'local', citas: Store.getCitas(), pacientes: Store.getPacientes(), error: motivo || null };
+  }
+
+  async function cargarDatosVista() {
+    try {
+      const resultado = await supabaseListarCitasYPacientes();
+      if (resultado.ok) {
+        vistaDatos = { fuente: 'supabase', citas: resultado.citas, pacientes: resultado.pacientes, error: null };
+      } else {
+        usarDatosLocales(resultado.mensaje);
+      }
+    } catch (e) {
+      console.warn('cargarDatosVista: fallo inesperado, usando respaldo local.', e);
+      usarDatosLocales('Ocurrió un error inesperado al conectar con Supabase.');
+    }
+  }
+
+  /** Deja explícito, en Dashboard y Agenda, si lo que se ve viene confirmado de Supabase o es el respaldo local. */
+  function renderFuenteDatos() {
+    const esSupabase = vistaDatos.fuente === 'supabase';
+    const texto = esSupabase
+      ? 'Datos sincronizados con Supabase.'
+      : `Mostrando tu respaldo local, sin confirmar en Supabase${vistaDatos.error ? ` (${vistaDatos.error})` : '.'}`;
+    const color = esSupabase ? 'var(--teal-600)' : 'var(--red-500)';
+    [dashboardFuenteNota, agendaFuenteNota].forEach((el) => {
+      if (!el) return;
+      el.textContent = texto;
+      el.style.color = color;
+    });
+  }
+
+  /** Pinta Dashboard/Agenda con lo último conocido y, de fondo, intenta traer la versión confirmada de Supabase. */
+  async function refrescarVistaSupabase() {
+    renderDashboard();
+    renderAgenda();
+    renderFuenteDatos();
+    await cargarDatosVista();
+    renderDashboard();
+    renderAgenda();
+    renderFuenteDatos();
+  }
+
   function setActiveView(view) {
     navItems.forEach((btn) => btn.classList.toggle('is-active', btn.dataset.view === view));
     viewPanels.forEach((panel) => {
       panel.hidden = panel.dataset.viewPanel !== view;
     });
-    if (view === 'dashboard') renderDashboard();
-    if (view === 'agenda') renderAgenda();
+    if (view === 'dashboard' || view === 'agenda') {
+      refrescarVistaSupabase(); // pinta de inmediato con lo último conocido y luego actualiza con Supabase
+    }
     if (view === 'pacientes') renderPacientes();
     if (view === 'recordatorios') renderRecordatorios();
     closeMobileSidebar();
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   }
 
-  /** Refresca todas las vistas que dependen de las citas/pacientes guardados. */
+  /** Refresca todas las vistas que dependen de las citas/pacientes guardados (tras crear/editar/eliminar). */
   function refreshAll() {
+    usarDatosLocales('Cambios guardados en este navegador; aún no se han vuelto a migrar a Supabase.');
+    renderFuenteDatos();
     renderDashboard();
     renderAgenda();
     renderPacientes();
@@ -296,7 +370,7 @@
 
   // ---------- Render: Dashboard ----------
   function renderDashboard() {
-    const citas = Store.getCitas();
+    const citas = vistaDatos.citas;
     const hoy = todayISO();
 
     const citasHoy = citas.filter((c) => c.fecha === hoy);
@@ -306,6 +380,8 @@
     statHoy.textContent = citasHoy.length;
     statPendientes.textContent = pendientes.length;
     statConfirmadas.textContent = confirmadas.length;
+    statTotalPacientes.textContent = vistaDatos.pacientes.length;
+    statTotalCitas.textContent = citas.length;
 
     // Próxima cita: primera cita futura (hoy en adelante) que no esté cancelada,
     // ordenada por fecha y hora.
@@ -651,6 +727,21 @@
     const card = document.createElement('div');
     card.className = 'cita-card';
     card.dataset.estado = cita.estado;
+    // `_soloLectura`: esta cita vino de Supabase pero no tiene contraparte en este
+    // navegador (no se migró desde aquí), así que aquí no se puede editar/eliminar
+    // vía `Store` — se oculta el control en vez de ofrecer un botón que no hace nada.
+    const accionesEdicion = cita._soloLectura
+      ? ''
+      : `
+        <button type="button" class="cita-action-btn" data-action="editar" data-id="${cita.id}">Editar</button>
+        <button type="button" class="cita-action-btn cita-action-btn--danger" data-action="eliminar" data-id="${cita.id}">Eliminar</button>
+        <select class="cita-status-select" data-action="estado" data-id="${cita.id}">
+          <option value="pendiente" ${cita.estado === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+          <option value="confirmada" ${cita.estado === 'confirmada' ? 'selected' : ''}>Confirmada</option>
+          <option value="atendida" ${cita.estado === 'atendida' ? 'selected' : ''}>Atendida</option>
+          <option value="cancelada" ${cita.estado === 'cancelada' ? 'selected' : ''}>Cancelada</option>
+        </select>
+      `;
     card.innerHTML = `
       <div class="cita-card-top">
         <div class="cita-card-time">${formatHora12(cita.hora)}–${formatHora12(finCalculado)}</div>
@@ -661,25 +752,19 @@
       </div>
       <div class="cita-card-actions">
         <button type="button" class="cita-action-btn" data-action="ver" data-id="${cita.id}">Ver</button>
-        <button type="button" class="cita-action-btn" data-action="editar" data-id="${cita.id}">Editar</button>
-        <button type="button" class="cita-action-btn cita-action-btn--danger" data-action="eliminar" data-id="${cita.id}">Eliminar</button>
-        <select class="cita-status-select" data-action="estado" data-id="${cita.id}">
-          <option value="pendiente" ${cita.estado === 'pendiente' ? 'selected' : ''}>Pendiente</option>
-          <option value="confirmada" ${cita.estado === 'confirmada' ? 'selected' : ''}>Confirmada</option>
-          <option value="atendida" ${cita.estado === 'atendida' ? 'selected' : ''}>Atendida</option>
-          <option value="cancelada" ${cita.estado === 'cancelada' ? 'selected' : ''}>Cancelada</option>
-        </select>
+        ${accionesEdicion}
       </div>
     `;
     // aria-label se asigna vía DOM (no interpolado en el HTML) para que un nombre
     // de paciente con comillas no pueda romper el atributo ni inyectar marcado.
-    card.querySelector('.cita-status-select').setAttribute('aria-label', `Cambiar estado de ${cita.paciente}`);
+    const statusSelect = card.querySelector('.cita-status-select');
+    if (statusSelect) statusSelect.setAttribute('aria-label', `Cambiar estado de ${cita.paciente}`);
     return card;
   }
 
   function renderAgendaDia() {
     const cfg = Store.getConfig();
-    const todas = Store.getCitas().filter((c) => c.fecha === agendaState.date);
+    const todas = vistaDatos.citas.filter((c) => c.fecha === agendaState.date);
     const visibles = getFilteredCitas(todas).sort((a, b) => a.hora.localeCompare(b.hora));
     const slots = generateSlots(cfg);
 
@@ -745,7 +830,7 @@
     let totalVisible = 0;
 
     dias.forEach((fecha) => {
-      const citasDia = getFilteredCitas(Store.getCitas().filter((c) => c.fecha === fecha)).sort((a, b) => a.hora.localeCompare(b.hora));
+      const citasDia = getFilteredCitas(vistaDatos.citas.filter((c) => c.fecha === fecha)).sort((a, b) => a.hora.localeCompare(b.hora));
       totalVisible += citasDia.length;
 
       const col = document.createElement('div');
@@ -856,10 +941,18 @@
     if (!target) return;
     const { action, id } = target.dataset;
     if (!id) return;
+
+    if (action === 'ver') {
+      // "Ver" es de solo lectura: puede resolverse contra lo que esté pintado ahora
+      // mismo (venga de Supabase o del respaldo local), sin depender de que exista
+      // en Store — a diferencia de editar/eliminar, que sí siguen sobre Store.
+      const cita = vistaDatos.citas.find((c) => c.id === id) || Store.getCitaById(id);
+      if (cita) openDetalleModal(cita);
+      return;
+    }
+
     const cita = Store.getCitaById(id);
     if (!cita) return;
-
-    if (action === 'ver') openDetalleModal(cita);
     if (action === 'editar') openCitaModal(cita);
     if (action === 'eliminar') openConfirmDelete(id);
   });
@@ -1307,11 +1400,12 @@
 
     agendaState.date = todayISO();
     renderClinicHeader();
+    usarDatosLocales(); // primer pintado inmediato con lo que haya en este navegador
     renderDashboard();
     renderAgenda();
     renderPacientes();
     renderRecordatorios();
-    setActiveView('dashboard');
+    setActiveView('dashboard'); // dispara además el refresco contra Supabase
   }
 
   formLogin.addEventListener('submit', async (e) => {
