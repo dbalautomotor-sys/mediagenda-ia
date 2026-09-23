@@ -481,10 +481,17 @@ async function supabaseGetConfiguracion() {
  * tu proyecto de Supabase para inspeccionar el esquema real, no pude
  * verificar los nombres exactos de columna ni ejecutar ningún SQL.
  * Lo de abajo son SUPUESTOS basados en los campos que ya usa `Store`
- * en este mismo archivo, ajustados con lo que confirmaste en tu
- * última revisión:
+ * en este mismo archivo, ajustados con lo que confirmaste en tus
+ * últimas dos revisiones:
+ *   - CONFIRMADO por un error real de Supabase: la tabla `citas` NO
+ *     tiene columna de texto `paciente` ('Could not find the
+ *     'paciente' column of 'citas' in the schema cache'). Por eso ya
+ *     no se envía ese campo — la relación con el paciente viaja
+ *     únicamente por `paciente_id`.
  *   - `pacientes` y `citas` tienen una columna `id` (uuid, primary
- *     key) y una columna `owner_id` (uuid).
+ *     key) y una columna `owner_id` (uuid). Esto AÚN es un supuesto:
+ *     si `citas` también rechaza `id` o `owner_id`, el mensaje de
+ *     error te dirá cuál columna revisar.
  *   - `configuracion` NO tiene columna `id` propia: su clave
  *     primaria es `owner_id` (una fila por usuario). Por eso su
  *     migración usa `upsert` con `onConflict: 'owner_id'` en vez de
@@ -493,9 +500,12 @@ async function supabaseGetConfiguracion() {
  *     se inserta con ese campo en null. Si el paciente de esa cita no
  *     se pudo migrar, la cita se cuenta como fallida y no se envía a
  *     Supabase — ver `migrarCitasASupabase`.
- *   - Los demás nombres de columna están en `SUPABASE_COLUMNAS` aquí
- *     abajo — es el ÚNICO lugar que necesitas editar si tus columnas
- *     reales se llaman distinto.
+ *   - Los demás nombres de columna (`motivo`, `fecha`, `hora`,
+ *     `duracion`, `estado`, `recordatorio_estado`) están en
+ *     `SUPABASE_COLUMNAS` aquí abajo — es el ÚNICO lugar que
+ *     necesitas editar si alguno de esos se llama distinto (el
+ *     mensaje de error de Supabase, como el de `paciente` arriba, te
+ *     dirá exactamente cuál).
  * La detección de duplicados en `configuracion` queda a cargo del
  * propio `upsert` de Supabase (por `owner_id`), así que funciona
  * incluso entre navegadores distintos. Para `pacientes` y `citas` la
@@ -513,7 +523,6 @@ const SUPABASE_COLUMNAS = {
   pacientes: { nombre: 'nombre', telefono: 'telefono', correo: 'correo', notas: 'notas' },
   citas: {
     pacienteId: 'paciente_id',
-    paciente: 'paciente',
     motivo: 'motivo',
     fecha: 'fecha',
     hora: 'hora',
@@ -647,7 +656,6 @@ async function migrarCitasASupabase(ownerId, estado) {
         id: nuevoId,
         owner_id: ownerId,
         [col.pacienteId]: pacienteIdSupabase,
-        [col.paciente]: c.paciente || '',
         [col.motivo]: c.motivo || '',
         [col.fecha]: c.fecha,
         [col.hora]: c.hora,
